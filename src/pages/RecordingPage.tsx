@@ -26,7 +26,7 @@ export function RecordingPage({ onNavigate }: RecordingPageProps) {
 
       await HealthMonitoringAPI.ensureUserProfile(user.id, user.email || '');
 
-      const videoUrl = `recording-${Date.now()}.webm`;
+      const videoUrl = await HealthMonitoringAPI.uploadVideo(user.id, videoBlob);
 
       const recording = await HealthMonitoringAPI.createRecording(
         user.id,

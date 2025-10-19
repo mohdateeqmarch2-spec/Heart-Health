@@ -52,8 +52,12 @@ Deno.serve(async (req: Request) => {
 
     let heartRateData: HeartRateDataPoint[];
     let riskPrediction: RiskPredictionResult;
+    let usedRealAnalysis = false;
 
     try {
+      console.log(`Attempting to connect to Python backend at ${pythonBackendUrl}`);
+      console.log(`Analyzing video: ${video_url}`);
+
       const response = await fetch(`${pythonBackendUrl}/analyze-video`, {
         method: 'POST',
         headers: {
@@ -63,19 +67,26 @@ Deno.serve(async (req: Request) => {
           recording_id,
           video_url,
         }),
-        signal: AbortSignal.timeout(120000),
+        signal: AbortSignal.timeout(180000),
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Python backend returned ${response.status}: ${errorText}`);
         throw new Error(`Python backend returned ${response.status}`);
       }
 
       const result = await response.json();
       heartRateData = result.heart_rate_data;
       riskPrediction = result.risk_prediction;
+      usedRealAnalysis = true;
+
+      console.log('✓ Successfully received real PyVHR analysis from Python backend');
+      console.log(`Heart rate data points: ${heartRateData.length}`);
     } catch (backendError) {
       console.error('Python backend error, falling back to simulation:', backendError);
-      
+      console.warn('⚠ Using simulated data instead of real PyVHR analysis');
+
       heartRateData = generateSimulatedHeartRate(60);
       riskPrediction = generateSimulatedRisk(heartRateData);
     }
@@ -116,6 +127,7 @@ Deno.serve(async (req: Request) => {
         recording_id,
         heart_rate_points: heartRateData.length,
         risk_level: riskPrediction.risk_level,
+        analysis_type: usedRealAnalysis ? 'pyvhr' : 'simulated',
       }),
       {
         headers: {
